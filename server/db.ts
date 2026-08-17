@@ -1,92 +1,54 @@
-import { eq } from "drizzle-orm";
+import { count, desc, eq, inArray, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, users } from "../drizzle/schema";
-import { ENV } from './_core/env';
+import { conversations, faqCandidates, faqEntries, inboxImports, integrationSettings, messageEvents, metricSnapshots, socialPosts, systemJobs, type FAQEntry, type InsertFAQEntry, type InsertUser, type User, users, webhookDeliveries } from "../drizzle/schema";
+import type { FaqSeed } from "./social/types";
 
 let _db: ReturnType<typeof drizzle> | null = null;
-
-// Lazily create the drizzle instance so local tooling can run without a DB.
-export async function getDb() {
-  if (!_db && process.env.DATABASE_URL) {
-    try {
-      _db = drizzle(process.env.DATABASE_URL);
-    } catch (error) {
-      console.warn("[Database] Failed to connect:", error);
-      _db = null;
-    }
-  }
-  return _db;
-}
+export async function getDb() { if (!_db && process.env.DATABASE_URL) _db = drizzle(process.env.DATABASE_URL); return _db; }
+async function requireDb() { const db = await getDb(); if (!db) throw new Error("Database connection is unavailable."); return db; }
 
 export async function upsertUser(user: InsertUser): Promise<void> {
-  if (!user.openId) {
-    throw new Error("User openId is required for upsert");
-  }
+  const db = await requireDb();
+  const role = user.role ?? (user.openId === process.env.OWNER_OPEN_ID ? "admin" : "user");
+  await db.insert(users).values({ openId: user.openId, name: user.name ?? null, email: user.email ?? null, loginMethod: user.loginMethod ?? null, role, lastSignedIn: user.lastSignedIn ?? new Date() }).onDuplicateKeyUpdate({ set: { name: user.name ?? null, email: user.email ?? null, loginMethod: user.loginMethod ?? null, lastSignedIn: user.lastSignedIn ?? new Date() } });
+}
+export async function getUserByOpenId(openId: string): Promise<User | undefined> { const db = await getDb(); if (!db) return undefined; return (await db.select().from(users).where(eq(users.openId, openId)).limit(1))[0]; }
 
-  const db = await getDb();
-  if (!db) {
-    console.warn("[Database] Cannot upsert user: database not available");
-    return;
-  }
+export async function ensureInitialFaqs(seeds: FaqSeed[]) { const db = await requireDb(); for (const seed of seeds) await db.insert(faqEntries).values({ ...seed, status: "approved" }).onDuplicateKeyUpdate({ set: { updatedAt: new Date() } }); }
+export async function getApprovedFaqEntries(): Promise<FAQEntry[]> { const db = await requireDb(); return db.select().from(faqEntries).where(eq(faqEntries.status, "approved")).orderBy(faqEntries.sortOrder); }
+export async function listFaqEntries() { const db = await requireDb(); return db.select().from(faqEntries).orderBy(faqEntries.sortOrder, desc(faqEntries.updatedAt)); }
+export async function createFaqEntry(input: InsertFAQEntry) { const db = await requireDb(); const [result] = await db.insert(faqEntries).values(input); return Number(result.insertId); }
+export async function updateFaqEntry(id: number, input: Partial<InsertFAQEntry>) { const db = await requireDb(); await db.update(faqEntries).set({ ...input, updatedAt: new Date() }).where(eq(faqEntries.id, id)); }
 
-  try {
-    const values: InsertUser = {
-      openId: user.openId,
-    };
-    const updateSet: Record<string, unknown> = {};
-
-    const textFields = ["name", "email", "loginMethod"] as const;
-    type TextField = (typeof textFields)[number];
-
-    const assignNullable = (field: TextField) => {
-      const value = user[field];
-      if (value === undefined) return;
-      const normalized = value ?? null;
-      values[field] = normalized;
-      updateSet[field] = normalized;
-    };
-
-    textFields.forEach(assignNullable);
-
-    if (user.lastSignedIn !== undefined) {
-      values.lastSignedIn = user.lastSignedIn;
-      updateSet.lastSignedIn = user.lastSignedIn;
-    }
-    if (user.role !== undefined) {
-      values.role = user.role;
-      updateSet.role = user.role;
-    } else if (user.openId === ENV.ownerOpenId) {
-      values.role = 'admin';
-      updateSet.role = 'admin';
-    }
-
-    if (!values.lastSignedIn) {
-      values.lastSignedIn = new Date();
-    }
-
-    if (Object.keys(updateSet).length === 0) {
-      updateSet.lastSignedIn = new Date();
-    }
-
-    await db.insert(users).values(values).onDuplicateKeyUpdate({
-      set: updateSet,
-    });
-  } catch (error) {
-    console.error("[Database] Failed to upsert user:", error);
-    throw error;
-  }
+export async function createInboxImport(input: { fileName: string; fileCount: number; totalCustomerMessages: number; uniqueQuestionCount: number; repeatedQuestionMessages: number; repeatedQuestionRate: number }) { const db = await requireDb(); const [result] = await db.insert(inboxImports).values({ ...input, repeatedQuestionRate: Math.round(input.repeatedQuestionRate * 100) }); return Number(result.insertId); }
+export async function insertFaqCandidates(importId: number, candidates: Array<{ question: string; answer: string | null; language: "en" | "ar"; frequency: number; sampleThreadRef: string | null }>) { if (!candidates.length) return; const db = await requireDb(); await db.insert(faqCandidates).values(candidates.map(candidate => ({ importId, question: candidate.question, suggestedAnswer: candidate.answer, language: candidate.language, frequency: candidate.frequency, sampleThreadRef: candidate.sampleThreadRef }))); }
+export async function listInboxImports() { const db = await requireDb(); return db.select().from(inboxImports).orderBy(desc(inboxImports.createdAt)); }
+export async function listFaqCandidates() { const db = await requireDb(); return db.select().from(faqCandidates).orderBy(desc(faqCandidates.frequency), desc(faqCandidates.createdAt)).limit(500); }
+export async function promoteCandidateToDraft(candidateId: number) {
+  const db = await requireDb(); const candidate = (await db.select().from(faqCandidates).where(eq(faqCandidates.id, candidateId)).limit(1))[0];
+  if (!candidate) throw new Error("FAQ candidate not found."); if (candidate.status !== "pending") throw new Error("Only pending candidates can be promoted.");
+  const draftId = await createFaqEntry({ slug: `inbox-${candidate.id}-${Date.now()}`, status: "draft", source: "inbox", questionEn: candidate.language === "en" ? candidate.question : "", questionAr: candidate.language === "ar" ? candidate.question : "", answerEn: candidate.language === "en" ? candidate.suggestedAnswer ?? "" : "", answerAr: candidate.language === "ar" ? candidate.suggestedAnswer ?? "" : "", keywordsEn: [], keywordsAr: [], intentAliases: [], sortOrder: 999 });
+  await db.update(faqCandidates).set({ status: "promoted", createdFaqId: draftId }).where(eq(faqCandidates.id, candidateId)); return draftId;
 }
 
-export async function getUserByOpenId(openId: string) {
-  const db = await getDb();
-  if (!db) {
-    console.warn("[Database] Cannot get user: database not available");
-    return undefined;
-  }
-
-  const result = await db.select().from(users).where(eq(users.openId, openId)).limit(1);
-
-  return result.length > 0 ? result[0] : undefined;
-}
-
-// TODO: add feature queries here as your schema grows.
+type Channel = "instagram_dm" | "instagram_story_reply" | "instagram_comment" | "facebook_messenger" | "facebook_comment";
+export async function upsertConversation(input: { conversationKey: string; senderId: string; channel: Channel }) { const db = await requireDb(); const now = new Date(); await db.insert(conversations).values({ ...input, lastMessageAt: now }).onDuplicateKeyUpdate({ set: { lastMessageAt: now, updatedAt: now } }); const row = (await db.select().from(conversations).where(eq(conversations.conversationKey, input.conversationKey)).limit(1))[0]; if (!row) throw new Error("Conversation could not be loaded."); return row; }
+export async function setConversationLanguage(id: number, language: "en" | "ar") { const db = await requireDb(); await db.update(conversations).set({ language, updatedAt: new Date() }).where(eq(conversations.id, id)); }
+export async function markConversationEscalated(id: number) { const db = await requireDb(); await db.update(conversations).set({ status: "escalated", isEscalated: true, updatedAt: new Date() }).where(eq(conversations.id, id)); }
+export async function markConversationResolved(id: number) { const db = await requireDb(); await db.update(conversations).set({ status: "closed", updatedAt: new Date() }).where(eq(conversations.id, id)); }
+export async function appendMessageEvent(input: { conversationId: number; externalMessageId: string; externalTargetId?: string | null; channel: Channel; direction: "inbound" | "outbound"; body: string; language: "en" | "ar" | "unselected"; matchedFaqId: number | null; escalated: boolean }) { const db = await requireDb(); await db.insert(messageEvents).values(input).onDuplicateKeyUpdate({ set: { externalMessageId: input.externalMessageId } }); }
+export async function recordWebhookDelivery(input: { externalEventId: string; platform: "instagram" | "facebook"; eventType: string }) { const db = await requireDb(); const existing = await db.select({ id: webhookDeliveries.id }).from(webhookDeliveries).where(eq(webhookDeliveries.externalEventId, input.externalEventId)).limit(1); if (existing.length) return false; await db.insert(webhookDeliveries).values(input); return true; }
+export async function listConversations() { const db = await requireDb(); return db.select().from(conversations).orderBy(desc(conversations.lastMessageAt)).limit(200); }
+export async function getRecentMessageEvents() { const db = await requireDb(); return db.select().from(messageEvents).orderBy(desc(messageEvents.createdAt)).limit(200); }
+export async function getDashboardStats() { const db = await requireDb(); const [conversationCount] = await db.select({ value: count() }).from(conversations); const [escalationCount] = await db.select({ value: count() }).from(messageEvents).where(eq(messageEvents.escalated, true)); const [inboundCount] = await db.select({ value: count() }).from(messageEvents).where(eq(messageEvents.direction, "inbound")); const [outboundCount] = await db.select({ value: count() }).from(messageEvents).where(eq(messageEvents.direction, "outbound")); const [matchedCount] = await db.select({ value: count() }).from(messageEvents).where(sql`${messageEvents.matchedFaqId} is not null`); const [resolvedCount] = await db.select({ value: count() }).from(conversations).where(eq(conversations.status, "closed")); const commentsByPlatform = await db.select({ channel: messageEvents.channel, value: count() }).from(messageEvents).where(inArray(messageEvents.channel, ["instagram_comment", "facebook_comment"])).groupBy(messageEvents.channel); const commentsByPost = await db.select({ sourcePostId: messageEvents.externalTargetId, value: count() }).from(messageEvents).where(sql`${messageEvents.externalTargetId} is not null and ${messageEvents.channel} in ('instagram_comment', 'facebook_comment')`).groupBy(messageEvents.externalTargetId).orderBy(desc(count())).limit(5); const snapshots = await db.select().from(metricSnapshots).orderBy(desc(metricSnapshots.collectedAt)).limit(20); const followerTotals: Record<string, number> = {}; for (const snapshot of snapshots) if (followerTotals[snapshot.platform] === undefined) followerTotals[snapshot.platform] = snapshot.followers; return { conversations: conversationCount.value, inboundMessages: inboundCount.value, outboundReplies: outboundCount.value, matchedFaqReplies: matchedCount.value, escalations: escalationCount.value, resolvedConversations: resolvedCount.value, commentsByPlatform, commentsByPost, followerTotals, snapshots }; }
+export async function insertMetricSnapshot(input: { platform: "instagram" | "facebook"; followers: number; payload: Record<string, unknown> }) { const db = await requireDb(); await db.insert(metricSnapshots).values(input); }
+export async function getSystemJob(jobKey: string) { const db = await requireDb(); return (await db.select().from(systemJobs).where(eq(systemJobs.jobKey, jobKey)).limit(1))[0]; }
+export async function getSystemJobByTaskUid(taskUid: string) { const db = await requireDb(); return (await db.select().from(systemJobs).where(eq(systemJobs.taskUid, taskUid)).limit(1))[0]; }
+export async function upsertSystemJob(input: { jobKey: string; taskUid: string; cronExpression: string; callbackPath: string; isEnabled: boolean }) { const db = await requireDb(); await db.insert(systemJobs).values(input).onDuplicateKeyUpdate({ set: { taskUid: input.taskUid, cronExpression: input.cronExpression, callbackPath: input.callbackPath, isEnabled: input.isEnabled, updatedAt: new Date() } }); return getSystemJob(input.jobKey); }
+export async function createSocialPost(input: { platform: "instagram" | "facebook"; caption: string; mediaUrl: string | null }) { const db = await requireDb(); const [result] = await db.insert(socialPosts).values(input); return Number(result.insertId); }
+export async function getSocialPost(id: number) { const db = await requireDb(); return (await db.select().from(socialPosts).where(eq(socialPosts.id, id)).limit(1))[0]; }
+export async function updateSocialPost(id: number, input: { status: "draft" | "approved" | "published" | "failed"; externalPostId?: string; publishedAt?: Date }) { const db = await requireDb(); await db.update(socialPosts).set(input).where(eq(socialPosts.id, id)); }
+export async function approveSocialPost(id: number) { const post = await getSocialPost(id); if (!post || post.status !== "draft") throw new Error("Only draft posts can be approved."); await updateSocialPost(id, { status: "approved" }); }
+export async function listSocialPosts() { const db = await requireDb(); return db.select().from(socialPosts).orderBy(desc(socialPosts.createdAt)).limit(100); }
+export async function getIntegrationMetadata() { const db = await requireDb(); return (await db.select().from(integrationSettings).where(eq(integrationSettings.settingsKey, "meta-audit")).limit(1))[0]; }
+export async function upsertIntegrationMetadata(metadata: Record<string, unknown>) { const db = await requireDb(); await db.insert(integrationSettings).values({ settingsKey: "meta-audit", metadata }).onDuplicateKeyUpdate({ set: { metadata, updatedAt: new Date() } }); return getIntegrationMetadata(); }

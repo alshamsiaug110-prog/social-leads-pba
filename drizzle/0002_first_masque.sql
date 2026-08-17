@@ -1,0 +1,1 @@
+ALTER TABLE `message_events` ADD `external_target_id` varchar(320);

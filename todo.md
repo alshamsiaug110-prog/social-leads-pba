@@ -1,0 +1,24 @@
+# Project TODO
+
+- [x] Inspect `inbox.zip` and `pasted_content.txt`, preserve source files outside the deployable project, and document the import schema and data-handling constraints.
+- [x] Add Drizzle schema tables for approved bilingual FAQ entries, FAQ import candidates, conversations, message events, webhook deliveries, and integration settings.
+- [x] Create a deterministic bilingual FAQ matcher that requires an approved entry, supports language-specific keyword/intent aliases, and never generates unapproved answers.
+- [x] Implement bot opening flows that identify the service as automated before any other content and require English or Arabic selection at the start of every new conversation.
+- [x] Implement unknown-question escalation replies containing the exact Maadi and New Cairo WhatsApp links, a 24-hour response expectation, and the Friday-off notice in both languages.
+- [x] Implement public Meta webhook verification and signed event ingestion for Instagram DMs, Story replies, comments, Facebook Messenger, and Page comments, with routing and idempotency controls.
+- [x] Implement secure outbound Meta reply adapters that enforce the selected language, approved FAQ-only responses, and channel-specific response rules.
+- [x] Build protected staff dashboard pages for FAQ entry approval and management, inbox JSON upload/review, integration readiness, and conversation/escalation logs.
+- [x] Seed the initial approved bilingual FAQ library from Premier Ballet Academy website content and PSI 2026 details, preserving PSI as an event-specific topic set.
+- [x] Add JSON inbox extraction that proposes candidate Q&A pairs for human review without automatically publishing historical answers.
+- [x] Add platform analytics data models and dashboard KPIs for inbound messages, replied messages, comments by platform and post, follower totals, resolved conversations, and escalations.
+- [x] Add secure Meta content-publishing controls for approved Facebook and Instagram posts, using server-side credentials only.
+- [x] Add owner-managed scheduled platform metric refreshes for 10:00, 16:00, and 22:00 using durable HTTP callbacks, plus a manual refresh control.
+- [x] Add Vitest coverage for the FAQ matcher, language gate, disclosure order, escalation text, event normalization, and import extraction.
+- [x] Verify the rendered dashboard, database migrations, webhook test payloads, and production readiness; create a final checkpoint for user-managed publication.
+- [x] Add a committed data-handling note covering Inbox ZIP limits, extraction schema, redaction rules, and storage constraints.
+- [x] Add a database-backed Meta integration-settings model for non-secret configuration metadata and readiness auditing.
+- [x] Extend analytics storage and dashboard KPIs to show replied-message counts, comments by platform and source post, follower totals, and resolved-conversation metrics.
+- [x] Add a draft-to-approved post workflow and limit live publishing to staff-approved content.
+- [ ] Add the Meta app secret, webhook verify token, Page access token, Facebook Page ID, Instagram professional account ID, and deliberate live-send flag through secure project settings.
+- [ ] Upgrade the published service to Reserved Hosting for an always-on webhook listener, then configure Meta subscriptions and validate live test conversations.
+- [ ] Publish the checkpointed application and activate the durable 10:00, 16:00, and 22:00 Cairo-time metrics schedule from the Integrations page.

@@ -1,33 +1,35 @@
-import { useAuth } from "@/_core/hooks/useAuth";
+import DashboardLayout from "@/components/DashboardLayout";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Loader2 } from "lucide-react";
-import { Streamdown } from 'streamdown';
+import { Card, CardContent } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+import { trpc } from "@/lib/trpc";
+import { Activity, AlertTriangle, Bot, CheckCircle2, RefreshCw, Users } from "lucide-react";
+import { toast } from "sonner";
 
-/**
- * All content in this page are only for example, replace with your own feature implementation
- * When building pages, remember your instructions in Frontend Workflow, Frontend Best Practices, Design Guide and Common Pitfalls
- */
-export default function Home() {
-  // The useAuth hook provides authentication state.
-  // To implement login/logout, call logout(), or start login from an event
-  // handler: onClick={() => startLogin()} (imported from "@/const"). Never call
-  // startLogin() during render (no href={startLogin()}) — it mints a one-time
-  // nonce cookie and must run only at the moment of navigation.
-  let { user, loading, error, isAuthenticated, logout } = useAuth();
-
-  // If theme is switchable in App.tsx, we can implement theme toggling like this:
-  // const { theme, toggleTheme } = useTheme();
-
-  return (
-    <div className="min-h-screen flex flex-col">
-      <main>
-        {/* Example: lucide-react for icons */}
-        <Loader2 className="animate-spin" />
-        Example Page
-        {/* Example: Streamdown for markdown rendering */}
-        <Streamdown>Any **markdown** content</Streamdown>
-        <Button variant="default">Example Button</Button>
-      </main>
-    </div>
-  );
+const format = new Intl.NumberFormat("en-US");
+function Metric({ label, value, detail, icon: Icon, tone }: { label: string; value: number; detail: string; icon: typeof Bot; tone: "gold" | "blue" | "rose" | "green" }) {
+  const tones = { gold: "bg-[#d4b07a]", blue: "bg-[#4d7a89]", rose: "bg-[#a95861]", green: "bg-[#5f8b77]" };
+  return <Card className="overflow-hidden border-[#dacdb9] bg-[#fffcf7] shadow-none"><CardContent className="p-5"><div className="flex items-start justify-between"><div><p className="text-xs font-medium uppercase tracking-[0.16em] text-[#7d7164]">{label}</p><p className="mt-4 font-display text-4xl leading-none text-[#102a37]">{format.format(value)}</p><p className="mt-3 text-xs text-[#81796d]">{detail}</p></div><span className={`flex h-10 w-10 items-center justify-center rounded-full ${tones[tone]} text-[#102a37]`}><Icon className="h-4 w-4" /></span></div></CardContent></Card>;
 }
+
+function OperationsHome() {
+  const summary = trpc.dashboard.summary.useQuery();
+  const readiness = trpc.dashboard.integrationReadiness.useQuery();
+  const refresh = trpc.dashboard.refreshMetrics.useMutation({ onSuccess: () => { toast.success("Metrics refresh completed."); summary.refetch(); readiness.refetch(); }, onError: error => toast.error(error.message) });
+  if (summary.isLoading) return <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">{Array.from({ length: 4 }).map((_, index) => <Skeleton key={index} className="h-40 bg-[#eadfce]" />)}</div>;
+  const data = summary.data ?? { conversations: 0, inboundMessages: 0, outboundReplies: 0, matchedFaqReplies: 0, escalations: 0, resolvedConversations: 0, commentsByPlatform: [], commentsByPost: [], followerTotals: {}, snapshots: [] };
+  const resolvedRate = data.inboundMessages ? Math.round((data.matchedFaqReplies / data.inboundMessages) * 100) : 0;
+  const integration = readiness.data;
+  return <>
+    <section className="relative overflow-hidden rounded-3xl bg-[#102a37] px-6 py-8 text-[#fbf7ef] shadow-[0_18px_60px_rgba(16,42,55,0.16)] sm:px-8"><div className="absolute -right-20 -top-24 h-64 w-64 rounded-full border border-[#d4b07a]/30" /><div className="absolute -right-8 -top-12 h-44 w-44 rounded-full border border-[#d4b07a]/25" /><div className="relative flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between"><div><p className="text-xs uppercase tracking-[0.26em] text-[#d4b07a]">Premier Ballet Academy</p><h1 className="mt-3 font-display text-5xl italic leading-none sm:text-6xl">Social operations</h1><p className="mt-4 max-w-2xl text-sm leading-6 text-[#cbd7d9]">A controlled bilingual response system for Instagram and Facebook. Every new direct conversation begins with bot disclosure and a language choice; only approved answers can be sent.</p></div><Button onClick={() => refresh.mutate()} disabled={refresh.isPending} className="bg-[#d4b07a] text-[#102a37] hover:bg-[#e5c993]"><RefreshCw className={`mr-2 h-4 w-4 ${refresh.isPending ? "animate-spin" : ""}`} />Refresh social metrics</Button></div></section>
+    <section className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4"><Metric label="Conversations" value={data.conversations} detail="Recorded direct-message threads" icon={Users} tone="gold" /><Metric label="Inbound messages" value={data.inboundMessages} detail="Across active supported channels" icon={Activity} tone="blue" /><Metric label="Approved answers" value={data.matchedFaqReplies} detail={`${resolvedRate}% of inbound messages matched`} icon={CheckCircle2} tone="green" /><Metric label="Escalations" value={data.escalations} detail="Sent to branch WhatsApp handoff" icon={AlertTriangle} tone="rose" /></section>
+    <section className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4"><Metric label="Replies sent" value={data.outboundReplies} detail="Approved FAQ and escalation responses" icon={Activity} tone="blue" /><Metric label="Resolved conversations" value={data.resolvedConversations} detail="Threads marked closed by staff" icon={CheckCircle2} tone="green" /><Metric label="Instagram followers" value={Number(data.followerTotals.instagram ?? 0)} detail="Latest collected platform total" icon={Users} tone="gold" /><Metric label="Facebook followers" value={Number(data.followerTotals.facebook ?? 0)} detail="Latest collected platform total" icon={Users} tone="gold" /></section>
+    <section className="mt-6 grid gap-6 xl:grid-cols-[1.5fr_1fr]"><Card className="border-[#dacdb9] bg-[#fffcf7] shadow-none"><CardContent className="p-6"><div className="flex items-center justify-between"><div><p className="text-xs font-medium uppercase tracking-[0.16em] text-[#7d7164]">Live workflow</p><h2 className="mt-1 font-display text-3xl italic text-[#102a37]">Response safeguards</h2></div><Badge className="border-0 bg-[#e5d9c7] text-[#604f3d]">FAQ-only</Badge></div><div className="mt-6 grid gap-3 sm:grid-cols-3"><div className="rounded-2xl border border-[#e4d8c7] p-4"><Bot className="h-5 w-5 text-[#4d7a89]" /><p className="mt-4 text-sm font-medium">1. Disclose</p><p className="mt-1 text-xs leading-5 text-[#7d7164]">The customer is told they are speaking with an automated assistant before any other content.</p></div><div className="rounded-2xl border border-[#e4d8c7] p-4"><span className="font-display text-xl text-[#4d7a89]">EN / ع</span><p className="mt-4 text-sm font-medium">2. Choose language</p><p className="mt-1 text-xs leading-5 text-[#7d7164]">English or Arabic is set at the start of each new direct conversation.</p></div><div className="rounded-2xl border border-[#e4d8c7] p-4"><AlertTriangle className="h-5 w-5 text-[#a95861]" /><p className="mt-4 text-sm font-medium">3. Escalate safely</p><p className="mt-1 text-xs leading-5 text-[#7d7164]">Unknown questions receive the relevant WhatsApp handoff with a 24-hour and Friday-off note.</p></div></div></CardContent></Card>
+      <Card className="border-[#dacdb9] bg-[#eae0d2] shadow-none"><CardContent className="p-6"><p className="text-xs font-medium uppercase tracking-[0.16em] text-[#7d7164]">Integration status</p><h2 className="mt-1 font-display text-3xl italic text-[#102a37]">Meta readiness</h2><div className="mt-5 space-y-3">{[{ label: "Webhook security", ready: integration?.readyForWebhook }, { label: "Live replies", ready: integration?.readyForReplies && integration?.liveSendingEnabled }, { label: "Metrics source", ready: integration?.hasPageToken }].map(item => <div key={item.label} className="flex items-center justify-between border-b border-[#d3c4b1] pb-3 text-sm"><span>{item.label}</span><Badge className={item.ready ? "bg-[#5f8b77]" : "bg-[#8b806f]"}>{item.ready ? "Ready" : "Needs setup"}</Badge></div>)}</div></CardContent></Card>
+    </section>
+    <section className="mt-6 grid gap-6 xl:grid-cols-2"><Card className="border-[#dacdb9] bg-[#fffcf7] shadow-none"><CardContent className="p-6"><p className="text-xs font-medium uppercase tracking-[0.16em] text-[#7d7164]">Community activity</p><h2 className="mt-1 font-display text-3xl italic text-[#102a37]">Comments by platform</h2><div className="mt-5 space-y-3">{data.commentsByPlatform.map(item => <div key={item.channel} className="flex items-center justify-between border-b border-[#e4d8c7] pb-3 text-sm"><span>{item.channel === "instagram_comment" ? "Instagram comments" : "Facebook comments"}</span><strong>{format.format(Number(item.value))}</strong></div>)}{!data.commentsByPlatform.length && <p className="rounded-xl border border-dashed border-[#cdbda9] p-4 text-sm text-[#7d7164]">Comment activity will appear after Meta events begin arriving.</p>}</div></CardContent></Card><Card className="border-[#dacdb9] bg-[#fffcf7] shadow-none"><CardContent className="p-6"><p className="text-xs font-medium uppercase tracking-[0.16em] text-[#7d7164]">Source-post monitoring</p><h2 className="mt-1 font-display text-3xl italic text-[#102a37]">Most discussed posts</h2><div className="mt-5 space-y-3">{data.commentsByPost.map(item => <div key={item.sourcePostId ?? "unknown"} className="flex items-center justify-between gap-4 border-b border-[#e4d8c7] pb-3 text-sm"><span className="truncate font-mono text-xs text-[#756b60]">{item.sourcePostId ?? "Unattributed source post"}</span><strong>{format.format(Number(item.value))}</strong></div>)}{!data.commentsByPost.length && <p className="rounded-xl border border-dashed border-[#cdbda9] p-4 text-sm text-[#7d7164]">Post-level comment totals will appear with incoming comment events.</p>}</div></CardContent></Card></section>
+  </>;
+}
+
+export default function Home() { return <DashboardLayout><OperationsHome /></DashboardLayout>; }

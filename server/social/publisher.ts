@@ -1,0 +1,43 @@
+import * as db from "../db";
+import { metaReadiness } from "./meta";
+
+const graphBase = process.env.META_GRAPH_API_BASE ?? "https://graph.facebook.com/v23.0";
+
+async function graphPost(path: string, payload: Record<string, string>) {
+  const token = process.env.META_PAGE_ACCESS_TOKEN;
+  if (!token) throw new Error("META_PAGE_ACCESS_TOKEN is not configured.");
+  const body = new URLSearchParams(payload);
+  const response = await fetch(`${graphBase}/${path}?access_token=${encodeURIComponent(token)}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body,
+  });
+  if (!response.ok) throw new Error((await response.text()).slice(0, 500));
+  return response.json() as Promise<Record<string, string>>;
+}
+
+export async function publishSocialPost(input: { postId: number }) {
+  const readiness = metaReadiness();
+  if (!readiness.liveSendingEnabled) throw new Error("Live publishing is locked. Set META_SEND_ENABLED=true only after staff approval and Meta verification.");
+  const approvedPost = await db.getSocialPost(input.postId);
+  if (!approvedPost || approvedPost.status !== "approved") throw new Error("Only staff-approved posts can be sent live.");
+  try {
+    let externalPostId: string;
+    if (approvedPost.platform === "facebook") {
+      if (!process.env.META_PAGE_ID) throw new Error("META_PAGE_ID is not configured.");
+      const response = await graphPost(`${process.env.META_PAGE_ID}/feed`, { message: approvedPost.caption, ...(approvedPost.mediaUrl ? { link: approvedPost.mediaUrl } : {}) });
+      externalPostId = response.id ?? "";
+    } else {
+      if (!process.env.META_INSTAGRAM_ACCOUNT_ID) throw new Error("META_INSTAGRAM_ACCOUNT_ID is not configured.");
+      if (!approvedPost.mediaUrl) throw new Error("Instagram publishing requires a public image URL.");
+      const container = await graphPost(`${process.env.META_INSTAGRAM_ACCOUNT_ID}/media`, { image_url: approvedPost.mediaUrl, caption: approvedPost.caption });
+      const published = await graphPost(`${process.env.META_INSTAGRAM_ACCOUNT_ID}/media_publish`, { creation_id: container.id });
+      externalPostId = published.id ?? "";
+    }
+    await db.updateSocialPost(approvedPost.id, { status: "published", externalPostId, publishedAt: new Date() });
+    return { id: approvedPost.id, externalPostId };
+  } catch (error) {
+    await db.updateSocialPost(approvedPost.id, { status: "failed" });
+    throw error;
+  }
+}
