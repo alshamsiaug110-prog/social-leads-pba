@@ -7,6 +7,7 @@ import type { InboundSocialEvent } from "./types";
 async function emit(event: InboundSocialEvent, conversationId: number | null, text: string, language: "en" | "ar" | "unselected", matchedFaqId: number | null, escalated: boolean) {
   const result = await sendMetaReply(event, text);
   if (conversationId) await db.appendMessageEvent({ conversationId, externalMessageId: `${event.externalEventId}:reply:${Date.now()}`, externalTargetId: event.targetId ?? null, channel: event.channel, direction: "outbound", body: text, language, matchedFaqId, escalated });
+  if (!result.sent && result.mode !== "dry-run") await db.createStaffNotification({ type: "reply_failure", severity: "critical", title: "Automated reply needs attention", detail: `A ${event.channel.replaceAll("_", " ")} reply could not be sent.`, href: "/conversations" });
   return result;
 }
 
@@ -23,5 +24,7 @@ export async function handleInboundEvent(event: InboundSocialEvent) {
   }
   const match = matchApprovedFaq(event.body, await db.getApprovedFaqEntries());
   if (match) { await emit(event, conversation.id, conversation.language === "ar" ? match.entry.answerAr : match.entry.answerEn, conversation.language, match.entry.id, false); return { handled: "faq" as const, faqId: match.entry.id }; }
-  await db.markConversationEscalated(conversation.id); await emit(event, conversation.id, escalationMessage(conversation.language, event.body), conversation.language, null, true); return { handled: "escalation" as const };
+  await db.markConversationEscalated(conversation.id);
+  await db.createStaffNotification({ type: "escalation", severity: "warning", title: "New WhatsApp escalation", detail: `An unanswered ${event.channel.replaceAll("_", " ")} question was handed off to the branch team.`, href: "/conversations" });
+  await emit(event, conversation.id, escalationMessage(conversation.language, event.body), conversation.language, null, true); return { handled: "escalation" as const };
 }

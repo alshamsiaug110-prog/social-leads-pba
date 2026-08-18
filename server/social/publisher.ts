@@ -38,9 +38,11 @@ export async function publishSocialPost(input: { postId: number }) {
       externalPostId = published.id ?? "";
     }
     await db.updateSocialPost(approvedPost.id, { status: "published", externalPostId, publishedAt: new Date() });
+    await db.createStaffNotification({ type: "publishing", severity: "info", title: "Approved post published", detail: `The approved ${approvedPost.platform} post was published successfully.`, href: "/publish" });
     return { id: approvedPost.id, externalPostId };
   } catch (error) {
     await db.updateSocialPost(approvedPost.id, { status: "failed" });
+    await db.createStaffNotification({ type: "publishing", severity: "critical", title: "Approved post failed to publish", detail: `The approved ${approvedPost.platform} post requires staff review.`, href: "/publish" });
     throw error;
   }
 }

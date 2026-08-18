@@ -37,3 +37,4 @@
 - [ ] Upgrade the published service to Reserved Hosting for an always-on webhook listener, then configure Meta subscriptions and validate live test conversations.
 - [ ] Keep autoscaling hosting by user decision; document its cold-start limitation and configure the Meta webhook only after a stable published URL is available.
 - [ ] Publish the checkpointed application and activate the durable 10:00, 16:00, and 22:00 Cairo-time metrics schedule from the Integrations page.
+- [x] Add a persistent in-website staff notification center for escalations, unhandled customer questions, integration failures, and publishing outcomes.

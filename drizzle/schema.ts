@@ -126,7 +126,19 @@ export const integrationSettings = mysqlTable("integration_settings", {
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
 }, table => ({ settingsKeyUnique: uniqueIndex("integration_settings_key_unique").on(table.settingsKey) }));
 
+export const staffNotifications = mysqlTable("staff_notifications", {
+  id: int("id").autoincrement().primaryKey(),
+  type: mysqlEnum("type", ["escalation", "reply_failure", "integration_failure", "publishing"]).notNull(),
+  severity: mysqlEnum("severity", ["info", "warning", "critical"]).default("info").notNull(),
+  title: varchar("title", { length: 180 }).notNull(),
+  detail: text("detail"),
+  href: varchar("href", { length: 255 }),
+  readAt: timestamp("read_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, table => ({ createdIndex: index("staff_notifications_created_index").on(table.createdAt), unreadIndex: index("staff_notifications_unread_index").on(table.readAt) }));
+
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 export type FAQEntry = typeof faqEntries.$inferSelect;
 export type InsertFAQEntry = typeof faqEntries.$inferInsert;
+export type StaffNotification = typeof staffNotifications.$inferSelect;

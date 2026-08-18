@@ -1,6 +1,6 @@
-import { count, desc, eq, inArray, sql } from "drizzle-orm";
+import { count, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { conversations, faqCandidates, faqEntries, inboxImports, integrationSettings, messageEvents, metricSnapshots, socialPosts, systemJobs, type FAQEntry, type InsertFAQEntry, type InsertUser, type User, users, webhookDeliveries } from "../drizzle/schema";
+import { conversations, faqCandidates, faqEntries, inboxImports, integrationSettings, messageEvents, metricSnapshots, socialPosts, staffNotifications, systemJobs, type FAQEntry, type InsertFAQEntry, type InsertUser, type User, users, webhookDeliveries } from "../drizzle/schema";
 import type { FaqSeed } from "./social/types";
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -50,5 +50,11 @@ export async function getSocialPost(id: number) { const db = await requireDb(); 
 export async function updateSocialPost(id: number, input: { status: "draft" | "approved" | "published" | "failed"; externalPostId?: string; publishedAt?: Date }) { const db = await requireDb(); await db.update(socialPosts).set(input).where(eq(socialPosts.id, id)); }
 export async function approveSocialPost(id: number) { const post = await getSocialPost(id); if (!post || post.status !== "draft") throw new Error("Only draft posts can be approved."); await updateSocialPost(id, { status: "approved" }); }
 export async function listSocialPosts() { const db = await requireDb(); return db.select().from(socialPosts).orderBy(desc(socialPosts.createdAt)).limit(100); }
+type NotificationType = "escalation" | "reply_failure" | "integration_failure" | "publishing";
+type NotificationSeverity = "info" | "warning" | "critical";
+export async function createStaffNotification(input: { type: NotificationType; severity: NotificationSeverity; title: string; detail?: string | null; href?: string | null }) { const db = await requireDb(); const [result] = await db.insert(staffNotifications).values(input); return Number(result.insertId); }
+export async function listStaffNotifications() { const db = await requireDb(); const notifications = await db.select().from(staffNotifications).orderBy(desc(staffNotifications.createdAt)).limit(50); const [unread] = await db.select({ value: count() }).from(staffNotifications).where(isNull(staffNotifications.readAt)); return { notifications, unreadCount: unread.value }; }
+export async function markStaffNotificationRead(id: number) { const db = await requireDb(); await db.update(staffNotifications).set({ readAt: new Date() }).where(eq(staffNotifications.id, id)); }
+export async function markAllStaffNotificationsRead() { const db = await requireDb(); await db.update(staffNotifications).set({ readAt: new Date() }).where(isNull(staffNotifications.readAt)); }
 export async function getIntegrationMetadata() { const db = await requireDb(); return (await db.select().from(integrationSettings).where(eq(integrationSettings.settingsKey, "meta-audit")).limit(1))[0]; }
 export async function upsertIntegrationMetadata(metadata: Record<string, unknown>) { const db = await requireDb(); await db.insert(integrationSettings).values({ settingsKey: "meta-audit", metadata }).onDuplicateKeyUpdate({ set: { metadata, updatedAt: new Date() } }); return getIntegrationMetadata(); }

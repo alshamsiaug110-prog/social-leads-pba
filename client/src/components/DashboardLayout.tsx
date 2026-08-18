@@ -5,7 +5,8 @@ import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarInset, Si
 import { startLogin } from "@/const";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { useIsMobile } from "@/hooks/useMobile";
-import { BarChart3, BookOpenCheck, ChevronRight, Inbox, LayoutDashboard, LogOut, MessagesSquare, PanelLeft, PlugZap, Send } from "lucide-react";
+import { trpc } from "@/lib/trpc";
+import { Bell, BookOpenCheck, CheckCheck, ChevronRight, Inbox, LayoutDashboard, LogOut, MessagesSquare, PanelLeft, PlugZap, Send, TriangleAlert } from "lucide-react";
 import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from "./DashboardLayoutSkeleton";
 
@@ -42,6 +43,10 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   const { toggleSidebar } = useSidebar();
   const isMobile = useIsMobile();
   const active = menuItems.find(item => item.path === location)?.label ?? "Social Desk";
+  const notifications = trpc.notifications.list.useQuery(undefined, { refetchInterval: 15_000 });
+  const utils = trpc.useUtils();
+  const markRead = trpc.notifications.markRead.useMutation({ onSuccess: () => utils.notifications.list.invalidate() });
+  const markAllRead = trpc.notifications.markAllRead.useMutation({ onSuccess: () => utils.notifications.list.invalidate() });
 
   return (
     <>
@@ -59,7 +64,16 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
           <DropdownMenu><DropdownMenuTrigger asChild><button className="flex w-full items-center gap-3 rounded-xl px-1 py-1 text-left hover:bg-[#1b3a48]"><Avatar className="h-9 w-9 border border-[#54717c]"><AvatarFallback className="bg-[#244553] text-xs text-[#fbf7ef]">{user?.name?.slice(0, 1).toUpperCase()}</AvatarFallback></Avatar><div className="min-w-0 group-data-[collapsible=icon]:hidden"><p className="truncate text-sm">{user?.name || "Administrator"}</p><p className="mt-0.5 text-xs text-[#9fb0b5]">Staff access</p></div></button></DropdownMenuTrigger><DropdownMenuContent align="end"><DropdownMenuItem onClick={logout} className="text-destructive"><LogOut className="mr-2 h-4 w-4" />Sign out</DropdownMenuItem></DropdownMenuContent></DropdownMenu>
         </SidebarFooter>
       </Sidebar>
-      <SidebarInset className="min-h-screen bg-[#f6f0e6]">
+      <SidebarInset className="relative min-h-screen bg-[#f6f0e6]">
+        <div className="fixed right-4 top-4 z-50 sm:right-6 sm:top-5">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild><Button variant="outline" size="icon" className="relative border-[#d0c0a8] bg-[#fffcf7] text-[#102a37] shadow-sm hover:bg-[#f0e4d1]" aria-label="Open staff notifications"><Bell className="h-4 w-4" />{notifications.data?.unreadCount ? <span className="absolute -right-1 -top-1 min-w-5 rounded-full bg-[#b84343] px-1 text-center text-[10px] font-bold leading-5 text-white">{notifications.data.unreadCount > 9 ? "9+" : notifications.data.unreadCount}</span> : null}</Button></DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-[min(25rem,calc(100vw-2rem))] border-[#d8cbb8] bg-[#fffcf7] p-0 text-[#102a37]">
+              <div className="flex items-center justify-between border-b border-[#e6dac7] px-4 py-3"><div><p className="font-display text-xl italic">Staff notifications</p><p className="text-xs text-[#756b60]">Operational events from the controlled social desk</p></div><Button variant="ghost" size="sm" className="text-xs text-[#4d7a89]" disabled={!notifications.data?.unreadCount || markAllRead.isPending} onClick={() => markAllRead.mutate()}><CheckCheck className="mr-1 h-3.5 w-3.5" />Read all</Button></div>
+              <div className="max-h-[min(30rem,calc(100vh-8rem))] overflow-y-auto">{notifications.isLoading ? <p className="p-5 text-sm text-[#756b60]">Loading notifications…</p> : notifications.data?.notifications.length ? notifications.data.notifications.map(item => <button key={item.id} className={`flex w-full gap-3 border-b border-[#eee3d4] px-4 py-3 text-left transition hover:bg-[#f6eddf] ${!item.readAt ? "bg-[#fff8ed]" : ""}`} onClick={() => { if (!item.readAt) markRead.mutate({ id: item.id }); if (item.href) setLocation(item.href); }}><span className={`mt-0.5 rounded-full p-1.5 ${item.severity === "critical" ? "bg-[#f6dede] text-[#af3f3f]" : item.severity === "warning" ? "bg-[#f7e7c4] text-[#8e651d]" : "bg-[#dcece4] text-[#3f7460]"}`}><TriangleAlert className="h-3.5 w-3.5" /></span><span className="min-w-0 flex-1"><span className="flex items-start justify-between gap-3"><span className="font-medium">{item.title}</span>{!item.readAt ? <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-[#b84343]" /> : null}</span>{item.detail ? <span className="mt-1 block text-xs leading-5 text-[#756b60]">{item.detail}</span> : null}<span className="mt-1 block text-[11px] text-[#9a8b7a]">{new Date(item.createdAt).toLocaleString()}</span></span></button>) : <p className="p-5 text-sm text-[#756b60]">No staff notifications yet.</p>}</div>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
         {isMobile && <header className="sticky top-0 z-40 flex h-14 items-center gap-3 border-b border-[#d8cbb8] bg-[#f6f0e6]/95 px-4 backdrop-blur"><SidebarTrigger className="text-[#102a37]" /><span className="font-display text-xl italic">{active}</span></header>}
         <main className="mx-auto w-full max-w-[1600px] p-4 sm:p-6 lg:p-8">{children}</main>
       </SidebarInset>

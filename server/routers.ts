@@ -26,6 +26,7 @@ export const appRouter = router({
     metricsStatus: adminProcedure.query(() => getMetricsScheduleStatus()),
     activateMetrics: adminProcedure.mutation(({ ctx }) => activateMetricsSchedule(ctx.req.headers.cookie)),
   }),
+  notifications: router({ list: adminProcedure.query(() => db.listStaffNotifications()), markRead: adminProcedure.input(z.object({ id: z.number().int().positive() })).mutation(({ input }) => db.markStaffNotificationRead(input.id)), markAllRead: adminProcedure.mutation(() => db.markAllStaffNotificationsRead()) }),
   integrations: router({ metadata: adminProcedure.query(() => db.getIntegrationMetadata()), saveMetadata: adminProcedure.input(z.object({ facebookPageUrl: z.string().url().optional(), instagramHandle: z.string().trim().max(100).optional(), verificationNote: z.string().trim().max(500).optional() })).mutation(({ input }) => db.upsertIntegrationMetadata(input)), discoverAccounts: adminProcedure.mutation(() => discoverMetaAccounts()), activateFacebookWebhook: adminProcedure.mutation(() => activateFacebookPageWebhook()) }),
   publisher: router({
     list: adminProcedure.query(() => db.listSocialPosts()),
