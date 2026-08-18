@@ -59,3 +59,17 @@ The Page-level activation is currently blocked only for Page comments: Meta retu
 ### Resolution — Page subscription active
 
 The Autubot system-user token was replaced through the authenticated Meta Business Settings flow with a non-expiring token that includes `pages_manage_metadata`. The replacement token validated successfully, and Meta confirmed the Page-level subscription is active for **Autubot** on **Premier Ballet Academy**. The active fields are `messages`, `messaging_postbacks`, `messaging_optins`, `message_reactions`, and `feed`. This enables Facebook Messenger events and Facebook Page comment events to reach the published webhook callback.
+
+## Instagram webhook callback status
+
+The authenticated Autubot Instagram API screen exposes the expected **Callback URL**, **Verify token**, and **Verify and save** controls, and the fields are currently blank. The confirmed production values are `https://pbabots-ugnivxro.manus.space/api/meta/webhook` and the existing protected project verify token. Direct navigation to the embedded Webhooks sub-tab did not render its form contents reliably in the browser session, so the callback is being completed through the visible API setup surface rather than by guessing an unpublished Meta configuration endpoint.
+
+The Instagram account-level subscription was activated successfully with the verified Instagram user token. Meta now reports the active Autubot subscription fields as `messages`, `comments`, and `message_reactions` for `@premierballet_academy`. This confirms that Instagram event categories are enabled at account level; the remaining app-level callback form remains the last visible Meta configuration item to verify.
+
+### Resolution — Instagram callback active
+
+Using Meta’s documented app-subscriptions flow, the Autubot app-level Instagram subscription was configured successfully for `https://pbabots-ugnivxro.manus.space/api/meta/webhook`. Meta confirms the `instagram` object is active for `messages`, `comments`, and `message_reactions`. The same subscription record confirms the `page` object remains active for `messages`, `messaging_postbacks`, `messaging_optins`, `message_reactions`, and `feed`. Both supported social channels now reference the same published, HMAC-validating webhook endpoint.
+
+## Autoscale operating note
+
+The project remains on Manus autoscaling hosting by the academy’s explicit decision. The public webhook route is stable and correctly validates Meta verification requests, but an autoscaling instance can have an initial cold-start delay after inactivity. Meta’s delivery retries and the implementation’s webhook-delivery deduplication provide resilience, but staff should monitor the notification center after long idle periods and consider Reserved hosting only if rapid first-event response becomes business-critical.

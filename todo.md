@@ -19,8 +19,8 @@
 - [x] Add a database-backed Meta integration-settings model for non-secret configuration metadata and readiness auditing.
 - [x] Extend analytics storage and dashboard KPIs to show replied-message counts, comments by platform and source post, follower totals, and resolved-conversation metrics.
 - [x] Add a draft-to-approved post workflow and limit live publishing to staff-approved content.
-- [ ] Add the Meta app secret, webhook verify token, Page access token, Facebook Page ID, Instagram professional account ID, and deliberate live-send flag through secure project settings.
-- [ ] Support a single long-lived Meta Page access token by discovering and persisting the connected Facebook Page and Instagram professional-account identifiers automatically.
+- [x] Add the Meta app secret, webhook verify token, Page access token, Facebook Page ID, Instagram professional account ID, and deliberate live-send flag through secure project settings.
+- [x] Replace the single-token preference with the verified durable Meta setup: an Autubot system-user token for Facebook Page operations plus an Instagram user token for Instagram operations, with identifiers discovered automatically.
 - [x] Extend account discovery to handle a valid Meta user or system-user token by resolving the authorised Premier Ballet Academy Page before reading its linked Instagram professional account.
 - [x] Derive and use the Page-specific access token returned by `/me/accounts` when the configured Facebook credential is a user token, including for Page webhook subscription and outbound Facebook operations.
 - [x] Use the derived Page-specific token to activate Autubot through the academy Page’s `subscribed_apps` endpoint.
@@ -32,9 +32,11 @@
 - [x] Route Instagram direct-message replies through the official Instagram API host using the dedicated Instagram user token, while retaining the Page token for Facebook operations.
 - [x] Accept the current direct Instagram `/me` identity response format when discovering the professional-account identifier.
 - [x] Align the staff integration screen with the verified requirement for a Page token for Facebook and an Instagram user token for Instagram operations.
-- [ ] Verify in Meta Business and the Meta developer dashboard that the authorised Page, linked Instagram professional account, app permissions, and token context satisfy the chatbot integration requirements.
-- [ ] Complete the outstanding Meta Business asset assignment, permission access, and webhook configuration steps after staff confirmation of each external setting change.
-- [ ] Upgrade the published service to Reserved Hosting for an always-on webhook listener, then configure Meta subscriptions and validate live test conversations.
-- [ ] Keep autoscaling hosting by user decision; document its cold-start limitation and configure the Meta webhook only after a stable published URL is available.
+- [x] Verify in Meta Business and the Meta developer dashboard that the authorised Page, linked Instagram professional account, app permissions, and token context satisfy the chatbot integration requirements.
+- [x] Complete the outstanding Meta Business asset assignment, permission access, and webhook configuration steps after staff confirmation of each external setting change.
+- [x] Retain autoscaling hosting because Reserved hosting was explicitly declined; configure Meta subscriptions and document the cold-start consideration.
+- [x] Keep autoscaling hosting by user decision; document its cold-start limitation and configure the Meta webhook only after a stable published URL is available.
+- [x] Add and verify a committed operations note that explains autoscaling cold starts and the recommended Meta-webhook monitoring response.
+- [ ] Confirm an end-to-end Instagram direct-message response from an external personal account after the production live-reply switch is enabled.
 - [ ] Publish the checkpointed application and activate the durable 10:00, 16:00, and 22:00 Cairo-time metrics schedule from the Integrations page.
 - [x] Add a persistent in-website staff notification center for escalations, unhandled customer questions, integration failures, and publishing outcomes.
