@@ -32,8 +32,8 @@ describe("Instagram token validation", () => {
     const token = process.env.META_INSTAGRAM_ACCESS_TOKEN;
     expect(token, "META_INSTAGRAM_ACCESS_TOKEN must be configured").toBeTruthy();
     const response = await fetch(`${instagramGraphBase}/me?fields=user_id,username&access_token=${encodeURIComponent(token as string)}`);
-    const payload = await response.json() as { data?: Array<{ user_id?: string; username?: string }>; error?: { code?: number; message?: string } };
+    const payload = await response.json() as { data?: Array<{ user_id?: string; username?: string }>; user_id?: string; username?: string; error?: { code?: number; message?: string } };
     expect(response.ok, `Instagram token validation failed with ${response.status}${payload.error?.code ? ` (code ${payload.error.code})` : ""}: ${payload.error?.message ?? "no error message returned"}`).toBe(true);
-    expect(payload.data?.[0]?.user_id, "Instagram token validation did not return a professional-account identifier.").toBeTruthy();
+    expect(payload.data?.[0]?.user_id ?? payload.user_id, "Instagram token validation did not return a professional-account identifier.").toBeTruthy();
   }, 20_000);
 });

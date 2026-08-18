@@ -53,9 +53,12 @@ export async function discoverMetaAccounts() {
     const authorisedPages = accountsPayload?.data?.filter(candidate => candidate.id) ?? [];
     const namedPage = authorisedPages.find(candidate => candidate.name?.toLowerCase().includes("premier ballet academy"));
     page = namedPage ?? (authorisedPages.length === 1 ? authorisedPages[0] : undefined);
-    if (!page) {
+    if (!page || !page.instagram_business_account?.id) {
       const directPageResponse = await fetch(`${graphBase}/${academyPageId}?fields=id,name,instagram_business_account{id,username}&access_token=${encodeURIComponent(pageToken)}`);
-      if (directPageResponse.ok) page = await directPageResponse.json() as typeof page;
+      if (directPageResponse.ok) {
+        const directPage = await directPageResponse.json() as typeof page;
+        if (directPage?.id) page = directPage;
+      }
     }
   }
 
@@ -63,10 +66,10 @@ export async function discoverMetaAccounts() {
   let instagramUsername = page?.instagram_business_account?.username;
   if (instagramToken) {
     const instagramResponse = await fetch(`${instagramGraphBase}/me?fields=user_id,username&access_token=${encodeURIComponent(instagramToken)}`);
-    const instagramPayload = await instagramResponse.json() as { data?: Array<{ user_id?: string; username?: string }>; error?: { message?: string } };
+    const instagramPayload = await instagramResponse.json() as { data?: Array<{ user_id?: string; username?: string }>; user_id?: string; username?: string; error?: { message?: string } };
     if (!instagramResponse.ok) throw new Error(`Instagram token validation failed: ${instagramPayload.error?.message ?? "no error message returned"}`);
-    const account = instagramPayload.data?.[0];
-    if (!account?.user_id) throw new Error("Instagram token validation did not return the professional-account identifier.");
+    const account = instagramPayload.data?.[0] ?? instagramPayload;
+    if (!account.user_id) throw new Error("Instagram token validation did not return the professional-account identifier.");
     instagramId = account.user_id;
     instagramUsername = account.username;
   }

@@ -22,8 +22,12 @@
 - [ ] Add the Meta app secret, webhook verify token, Page access token, Facebook Page ID, Instagram professional account ID, and deliberate live-send flag through secure project settings.
 - [ ] Support a single long-lived Meta Page access token by discovering and persisting the connected Facebook Page and Instagram professional-account identifiers automatically.
 - [ ] Extend account discovery to handle a valid Meta user or system-user token by resolving the authorised Premier Ballet Academy Page before reading its linked Instagram professional account.
-- [ ] Add a verified academy-Page discovery fallback that checks the confirmed Page identifier directly when Meta’s account-list endpoint does not expose linked Instagram details.
+- [x] Add a verified academy-Page discovery fallback that checks the confirmed Page identifier directly when Meta’s account-list endpoint does not expose linked Instagram details.
+- [x] Re-check the confirmed academy Page directly when the authorised Page list returns that Page without linked Instagram details.
+- [x] Add regression coverage for the authorised-Page-list fallback when the Instagram linkage is omitted.
 - [x] Route Instagram direct-message replies through the official Instagram API host using the dedicated Instagram user token, while retaining the Page token for Facebook operations.
+- [x] Accept the current direct Instagram `/me` identity response format when discovering the professional-account identifier.
+- [x] Align the staff integration screen with the verified requirement for a Page token for Facebook and an Instagram user token for Instagram operations.
 - [ ] Verify in Meta Business and the Meta developer dashboard that the authorised Page, linked Instagram professional account, app permissions, and token context satisfy the chatbot integration requirements.
 - [ ] Complete the outstanding Meta Business asset assignment, permission access, and webhook configuration steps after staff confirmation of each external setting change.
 - [ ] Upgrade the published service to Reserved Hosting for an always-on webhook listener, then configure Meta subscriptions and validate live test conversations.
