@@ -30,7 +30,7 @@ The direct permissions route was opened but did not render per-permission access
 
 The current authenticated Business Suite surface confirms that **Premier Ballet Academy** and **@premierballet_academy** are connected. The current authenticated developer account also confirms that the live **Autubot** app belongs to the Premier Ballet Academy business and exposes the required Instagram, Page, and Messenger product areas.
 
-However, the supplied token’s Graph API validation returned a valid principal but did not return one identifiable Premier Ballet Academy Page with a linked Instagram professional account through the authorised Page list. This prevents automatic runtime account discovery. In addition, the developer interface shows the Instagram messaging permissions and webhook controls as setup requirements but does not provide evidence that all are granted with live access or that a callback URL and verify token have been saved.
+The live Page token now validates against the confirmed Premier Ballet Academy Page. The approved Instagram user token validates against `graph.instagram.com` and returns the connected professional account. The protected staff dashboard successfully discovered and persisted the non-secret Page and Instagram identifiers, confirming the runtime account-discovery path. The developer interface still requires the published callback URL and verify token to be saved and the required webhook fields to be subscribed.
 
 ## Business asset confirmation
 
@@ -42,4 +42,20 @@ The app’s Connected assets tab is empty. Its available connection dialog expos
 
 The required Instagram permissions were added successfully in the Autubot Instagram API setup: `instagram_business_basic`, `instagram_business_manage_comments`, and `instagram_business_manage_messages`. Meta confirmed that all required permissions were added.
 
-The subsequent Add Instagram Account flow did not produce a tester-role assignment. The Autubot app’s Roles screen currently reports **0 of 50 testers**. The logged-in academy Instagram account therefore still needs to complete the tester-role authorization inside Meta’s account-add flow before it can generate the dedicated Instagram token for testing.
+The approved Instagram API token was subsequently generated and validated against the live Instagram identity endpoint. The account is no longer blocked on token generation for the current production activation; remaining work is to save the webhook callback and complete field subscriptions in the Autubot developer configuration.
+
+## Published service and live credential verification
+
+The social assistant is published at `https://pbabots-ugnivxro.manus.space/`. Its public webhook route is `https://pbabots-ugnivxro.manus.space/api/meta/webhook`. A direct request without Meta’s verification parameters returns the expected webhook-verification failure response, confirming that the route is live and rejects unauthenticated verification attempts.
+
+The protected staff dashboard successfully stored and displayed the Meta app secret, webhook verify token, Facebook Page access token, and Instagram user access token. Using these credentials, the dashboard completed account discovery and confirmed the linked assets as **Premier Ballet Academy** and **@premierballet_academy**.
+
+## Facebook Page webhook activation status
+
+The Autubot app-level Page webhook callback was configured successfully for `https://pbabots-ugnivxro.manus.space/api/meta/webhook` with the message, reaction, and Page-feed fields. The verified Facebook credential is a valid non-expiring **Autubot system-user token** and can derive a Page-specific token for the academy Page.
+
+The Page-level activation is currently blocked only for Page comments: Meta returned error `(#200)` stating that subscribing to the `feed` field requires `pages_manage_metadata`. The token currently has `pages_show_list`, `pages_messaging`, `pages_read_engagement`, `pages_manage_posts`, and `pages_manage_engagement`, but it does **not** have `pages_manage_metadata`. This specific scope must be granted to the Autubot system-user token, then the existing activation control can subscribe the academy Page without changing any bot behavior.
+
+### Resolution — Page subscription active
+
+The Autubot system-user token was replaced through the authenticated Meta Business Settings flow with a non-expiring token that includes `pages_manage_metadata`. The replacement token validated successfully, and Meta confirmed the Page-level subscription is active for **Autubot** on **Premier Ballet Academy**. The active fields are `messages`, `messaging_postbacks`, `messaging_optins`, `message_reactions`, and `feed`. This enables Facebook Messenger events and Facebook Page comment events to reach the published webhook callback.

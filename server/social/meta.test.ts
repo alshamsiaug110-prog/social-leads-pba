@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import * as db from "../db";
-import { buildMetaReplyRequest, discoverMetaAccounts, normalizeMetaPayload } from "./meta";
+import { activateFacebookPageWebhook, buildMetaReplyRequest, discoverMetaAccounts, normalizeMetaPayload, resolveFacebookPageAccessToken } from "./meta";
 
 vi.mock("../db", () => ({
   getIntegrationMetadata: vi.fn(),
@@ -36,6 +36,31 @@ describe("Meta event normalization", () => {
     vi.stubEnv("META_PAGE_ACCESS_TOKEN", "page-token");
     const request = buildMetaReplyRequest({ externalEventId: "message-2", platform: "facebook", channel: "facebook_messenger", senderId: "customer-2", body: "Arabic", occurredAt: new Date() }, "Hello", { pageId: "1097461780292447" });
     expect(request).toMatchObject({ url: "https://graph.facebook.com/v26.0/1097461780292447/messages", token: "page-token", payload: { recipient: { id: "customer-2" }, message: { text: "Hello" } } });
+  });
+
+  it("derives the Page-specific token when the configured Facebook credential is a user token", async () => {
+    vi.stubEnv("META_PAGE_ACCESS_TOKEN", "user-token");
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ id: "user-1" }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ data: [{ id: "1097461780292447", name: "Premier Ballet Academy", access_token: "page-token" }] }) });
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(resolveFacebookPageAccessToken("1097461780292447")).resolves.toBe("page-token");
+    expect(String(fetchMock.mock.calls[1]?.[0])).toContain("fields=id,name,access_token,instagram_business_account");
+  });
+
+  it("activates the academy Page subscription with the derived Page-specific token", async () => {
+    vi.stubEnv("META_PAGE_ACCESS_TOKEN", "user-token");
+    vi.mocked(db.getIntegrationMetadata).mockResolvedValue({ metadata: { pageId: "1097461780292447" } } as never);
+    vi.mocked(db.upsertIntegrationMetadata).mockResolvedValue(undefined);
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ id: "user-1" }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ data: [{ id: "1097461780292447", name: "Premier Ballet Academy", access_token: "derived-page-token" }] }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ success: true }) });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(activateFacebookPageWebhook()).resolves.toMatchObject({ pageId: "1097461780292447", active: true });
+    expect(String(fetchMock.mock.calls[2]?.[0])).toContain("/1097461780292447/subscribed_apps");
+    expect(String(fetchMock.mock.calls[2]?.[1]?.body)).toContain("access_token=derived-page-token");
   });
 
   it("re-checks the confirmed academy Page when the account list omits its Instagram linkage", async () => {

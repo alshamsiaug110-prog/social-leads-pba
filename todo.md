@@ -21,7 +21,11 @@
 - [x] Add a draft-to-approved post workflow and limit live publishing to staff-approved content.
 - [ ] Add the Meta app secret, webhook verify token, Page access token, Facebook Page ID, Instagram professional account ID, and deliberate live-send flag through secure project settings.
 - [ ] Support a single long-lived Meta Page access token by discovering and persisting the connected Facebook Page and Instagram professional-account identifiers automatically.
-- [ ] Extend account discovery to handle a valid Meta user or system-user token by resolving the authorised Premier Ballet Academy Page before reading its linked Instagram professional account.
+- [x] Extend account discovery to handle a valid Meta user or system-user token by resolving the authorised Premier Ballet Academy Page before reading its linked Instagram professional account.
+- [x] Derive and use the Page-specific access token returned by `/me/accounts` when the configured Facebook credential is a user token, including for Page webhook subscription and outbound Facebook operations.
+- [x] Use the derived Page-specific token to activate Autubot through the academy Page’s `subscribed_apps` endpoint.
+- [x] Add regression coverage that verifies Page webhook activation uses the derived Page-specific token.
+- [x] Confirm the academy Page-level app subscription is active after the helper runs.
 - [x] Add a verified academy-Page discovery fallback that checks the confirmed Page identifier directly when Meta’s account-list endpoint does not expose linked Instagram details.
 - [x] Re-check the confirmed academy Page directly when the authorised Page list returns that Page without linked Instagram details.
 - [x] Add regression coverage for the authorised-Page-list fallback when the Instagram linkage is omitted.

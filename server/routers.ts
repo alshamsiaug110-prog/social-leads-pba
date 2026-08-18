@@ -4,7 +4,7 @@ import { systemRouter } from "./_core/systemRouter";
 import { adminProcedure, publicProcedure, router } from "./_core/trpc";
 import * as db from "./db";
 import { parseFacebookInboxZip } from "./social/inboxImport";
-import { discoverMetaAccounts, metaReadinessWithStoredAccounts } from "./social/meta";
+import { activateFacebookPageWebhook, discoverMetaAccounts, metaReadinessWithStoredAccounts } from "./social/meta";
 import { refreshSocialMetrics } from "./social/metrics";
 import { seedInitialFaqs } from "./social/seed";
 import { activateMetricsSchedule, getMetricsScheduleStatus } from "./social/schedule";
@@ -26,7 +26,7 @@ export const appRouter = router({
     metricsStatus: adminProcedure.query(() => getMetricsScheduleStatus()),
     activateMetrics: adminProcedure.mutation(({ ctx }) => activateMetricsSchedule(ctx.req.headers.cookie)),
   }),
-  integrations: router({ metadata: adminProcedure.query(() => db.getIntegrationMetadata()), saveMetadata: adminProcedure.input(z.object({ facebookPageUrl: z.string().url().optional(), instagramHandle: z.string().trim().max(100).optional(), verificationNote: z.string().trim().max(500).optional() })).mutation(({ input }) => db.upsertIntegrationMetadata(input)), discoverAccounts: adminProcedure.mutation(() => discoverMetaAccounts()) }),
+  integrations: router({ metadata: adminProcedure.query(() => db.getIntegrationMetadata()), saveMetadata: adminProcedure.input(z.object({ facebookPageUrl: z.string().url().optional(), instagramHandle: z.string().trim().max(100).optional(), verificationNote: z.string().trim().max(500).optional() })).mutation(({ input }) => db.upsertIntegrationMetadata(input)), discoverAccounts: adminProcedure.mutation(() => discoverMetaAccounts()), activateFacebookWebhook: adminProcedure.mutation(() => activateFacebookPageWebhook()) }),
   publisher: router({
     list: adminProcedure.query(() => db.listSocialPosts()),
     createDraft: adminProcedure.input(z.object({ platform: z.enum(["facebook", "instagram"]), caption: z.string().trim().min(1).max(2200), mediaUrl: z.string().url().optional() })).mutation(({ input }) => db.createSocialPost({ platform: input.platform, caption: input.caption, mediaUrl: input.mediaUrl ?? null })),

@@ -1,13 +1,12 @@
 import * as db from "../db";
-import { metaReadiness, resolveMetaAccounts } from "./meta";
+import { metaReadiness, resolveFacebookPageAccessToken, resolveMetaAccounts } from "./meta";
 
-const graphBase = process.env.META_GRAPH_API_BASE ?? "https://graph.facebook.com/v23.0";
+const graphBase = process.env.META_GRAPH_API_BASE ?? "https://graph.facebook.com/v26.0";
+const instagramGraphBase = process.env.META_INSTAGRAM_API_BASE ?? "https://graph.instagram.com/v26.0";
 
-async function graphPost(path: string, payload: Record<string, string>) {
-  const token = process.env.META_PAGE_ACCESS_TOKEN;
-  if (!token) throw new Error("META_PAGE_ACCESS_TOKEN is not configured.");
+async function graphPost(base: string, path: string, payload: Record<string, string>, token: string) {
   const body = new URLSearchParams(payload);
-  const response = await fetch(`${graphBase}/${path}?access_token=${encodeURIComponent(token)}`, {
+  const response = await fetch(`${base}/${path}?access_token=${encodeURIComponent(token)}`, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body,
@@ -26,13 +25,16 @@ export async function publishSocialPost(input: { postId: number }) {
     let externalPostId: string;
     if (approvedPost.platform === "facebook") {
       if (!accounts.pageId) throw new Error("Connected Facebook Page ID has not been discovered.");
-      const response = await graphPost(`${accounts.pageId}/feed`, { message: approvedPost.caption, ...(approvedPost.mediaUrl ? { link: approvedPost.mediaUrl } : {}) });
+      const pageToken = await resolveFacebookPageAccessToken(accounts.pageId);
+      const response = await graphPost(graphBase, `${accounts.pageId}/feed`, { message: approvedPost.caption, ...(approvedPost.mediaUrl ? { link: approvedPost.mediaUrl } : {}) }, pageToken);
       externalPostId = response.id ?? "";
     } else {
       if (!accounts.instagramId) throw new Error("Connected Instagram professional account ID has not been discovered.");
       if (!approvedPost.mediaUrl) throw new Error("Instagram publishing requires a public image URL.");
-      const container = await graphPost(`${accounts.instagramId}/media`, { image_url: approvedPost.mediaUrl, caption: approvedPost.caption });
-      const published = await graphPost(`${accounts.instagramId}/media_publish`, { creation_id: container.id });
+      const instagramToken = process.env.META_INSTAGRAM_ACCESS_TOKEN;
+      if (!instagramToken) throw new Error("META_INSTAGRAM_ACCESS_TOKEN is not configured.");
+      const container = await graphPost(instagramGraphBase, `${accounts.instagramId}/media`, { image_url: approvedPost.mediaUrl, caption: approvedPost.caption }, instagramToken);
+      const published = await graphPost(instagramGraphBase, `${accounts.instagramId}/media_publish`, { creation_id: container.id }, instagramToken);
       externalPostId = published.id ?? "";
     }
     await db.updateSocialPost(approvedPost.id, { status: "published", externalPostId, publishedAt: new Date() });
