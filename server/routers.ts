@@ -4,7 +4,7 @@ import { systemRouter } from "./_core/systemRouter";
 import { adminProcedure, publicProcedure, router } from "./_core/trpc";
 import * as db from "./db";
 import { parseFacebookInboxZip } from "./social/inboxImport";
-import { metaReadiness } from "./social/meta";
+import { discoverMetaAccounts, metaReadinessWithStoredAccounts } from "./social/meta";
 import { refreshSocialMetrics } from "./social/metrics";
 import { seedInitialFaqs } from "./social/seed";
 import { activateMetricsSchedule, getMetricsScheduleStatus } from "./social/schedule";
@@ -15,7 +15,7 @@ const faqInput = z.object({ slug: z.string().trim().min(3).max(160), status: z.e
 export const appRouter = router({
   system: systemRouter,
   auth: router({ me: publicProcedure.query(opts => opts.ctx.user), logout: publicProcedure.mutation(({ ctx }) => { const cookieOptions = getSessionCookieOptions(ctx.req); ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 }); return { success: true } as const; }) }),
-  dashboard: router({ summary: adminProcedure.query(() => db.getDashboardStats()), conversations: adminProcedure.query(() => db.listConversations()), messages: adminProcedure.query(() => db.getRecentMessageEvents()), integrationReadiness: adminProcedure.query(() => metaReadiness()), refreshMetrics: adminProcedure.mutation(() => refreshSocialMetrics()), markConversationResolved: adminProcedure.input(z.object({ id: z.number().int().positive() })).mutation(({ input }) => db.markConversationResolved(input.id)) }),
+  dashboard: router({ summary: adminProcedure.query(() => db.getDashboardStats()), conversations: adminProcedure.query(() => db.listConversations()), messages: adminProcedure.query(() => db.getRecentMessageEvents()), integrationReadiness: adminProcedure.query(() => metaReadinessWithStoredAccounts()), refreshMetrics: adminProcedure.mutation(() => refreshSocialMetrics()), markConversationResolved: adminProcedure.input(z.object({ id: z.number().int().positive() })).mutation(({ input }) => db.markConversationResolved(input.id)) }),
   faqs: router({ list: adminProcedure.query(() => db.listFaqEntries()), create: adminProcedure.input(faqInput).mutation(({ input }) => db.createFaqEntry(input)), update: adminProcedure.input(z.object({ id: z.number().int().positive(), data: faqInput.partial() })).mutation(({ input }) => db.updateFaqEntry(input.id, input.data)), seedOfficial: adminProcedure.mutation(() => seedInitialFaqs()) }),
   imports: router({
     list: adminProcedure.query(() => db.listInboxImports()), candidates: adminProcedure.query(() => db.listFaqCandidates()),
@@ -26,7 +26,7 @@ export const appRouter = router({
     metricsStatus: adminProcedure.query(() => getMetricsScheduleStatus()),
     activateMetrics: adminProcedure.mutation(({ ctx }) => activateMetricsSchedule(ctx.req.headers.cookie)),
   }),
-  integrations: router({ metadata: adminProcedure.query(() => db.getIntegrationMetadata()), saveMetadata: adminProcedure.input(z.object({ facebookPageUrl: z.string().url().optional(), instagramHandle: z.string().trim().max(100).optional(), verificationNote: z.string().trim().max(500).optional() })).mutation(({ input }) => db.upsertIntegrationMetadata(input)) }),
+  integrations: router({ metadata: adminProcedure.query(() => db.getIntegrationMetadata()), saveMetadata: adminProcedure.input(z.object({ facebookPageUrl: z.string().url().optional(), instagramHandle: z.string().trim().max(100).optional(), verificationNote: z.string().trim().max(500).optional() })).mutation(({ input }) => db.upsertIntegrationMetadata(input)), discoverAccounts: adminProcedure.mutation(() => discoverMetaAccounts()) }),
   publisher: router({
     list: adminProcedure.query(() => db.listSocialPosts()),
     createDraft: adminProcedure.input(z.object({ platform: z.enum(["facebook", "instagram"]), caption: z.string().trim().min(1).max(2200), mediaUrl: z.string().url().optional() })).mutation(({ input }) => db.createSocialPost({ platform: input.platform, caption: input.caption, mediaUrl: input.mediaUrl ?? null })),

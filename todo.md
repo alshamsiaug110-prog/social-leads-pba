@@ -20,5 +20,12 @@
 - [x] Extend analytics storage and dashboard KPIs to show replied-message counts, comments by platform and source post, follower totals, and resolved-conversation metrics.
 - [x] Add a draft-to-approved post workflow and limit live publishing to staff-approved content.
 - [ ] Add the Meta app secret, webhook verify token, Page access token, Facebook Page ID, Instagram professional account ID, and deliberate live-send flag through secure project settings.
+- [ ] Support a single long-lived Meta Page access token by discovering and persisting the connected Facebook Page and Instagram professional-account identifiers automatically.
+- [ ] Extend account discovery to handle a valid Meta user or system-user token by resolving the authorised Premier Ballet Academy Page before reading its linked Instagram professional account.
+- [ ] Add a verified academy-Page discovery fallback that checks the confirmed Page identifier directly when Meta’s account-list endpoint does not expose linked Instagram details.
+- [x] Route Instagram direct-message replies through the official Instagram API host using the dedicated Instagram user token, while retaining the Page token for Facebook operations.
+- [ ] Verify in Meta Business and the Meta developer dashboard that the authorised Page, linked Instagram professional account, app permissions, and token context satisfy the chatbot integration requirements.
+- [ ] Complete the outstanding Meta Business asset assignment, permission access, and webhook configuration steps after staff confirmation of each external setting change.
 - [ ] Upgrade the published service to Reserved Hosting for an always-on webhook listener, then configure Meta subscriptions and validate live test conversations.
+- [ ] Keep autoscaling hosting by user decision; document its cold-start limitation and configure the Meta webhook only after a stable published URL is available.
 - [ ] Publish the checkpointed application and activate the durable 10:00, 16:00, and 22:00 Cairo-time metrics schedule from the Integrations page.
