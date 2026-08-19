@@ -33,6 +33,7 @@ export async function resolveFacebookPageAccessToken(requestedPageId?: string): 
 
 export function metaReadiness() {
   const hasAppSecret = Boolean(process.env.META_APP_SECRET);
+  const hasInstagramAppSecret = Boolean(process.env.META_INSTAGRAM_APP_SECRET);
   const hasVerifyToken = Boolean(process.env.META_VERIFY_TOKEN);
   const hasPageToken = Boolean(process.env.META_PAGE_ACCESS_TOKEN);
   const hasInstagramToken = Boolean(process.env.META_INSTAGRAM_ACCESS_TOKEN);
@@ -40,7 +41,7 @@ export function metaReadiness() {
   const hasInstagramId = Boolean(process.env.META_INSTAGRAM_ACCOUNT_ID);
   const readyForFacebookReplies = hasPageToken && hasPageId;
   const readyForInstagramReplies = hasInstagramToken && hasInstagramId;
-  return { hasAppSecret, hasVerifyToken, hasPageToken, hasInstagramToken, hasPageId, hasInstagramId, liveSendingEnabled: process.env.META_SEND_ENABLED === "true", readyForWebhook: hasAppSecret && hasVerifyToken, readyForFacebookReplies, readyForInstagramReplies, readyForReplies: readyForFacebookReplies && readyForInstagramReplies };
+  return { hasAppSecret, hasInstagramAppSecret, hasVerifyToken, hasPageToken, hasInstagramToken, hasPageId, hasInstagramId, liveSendingEnabled: process.env.META_SEND_ENABLED === "true", readyForWebhook: (hasAppSecret || hasInstagramAppSecret) && hasVerifyToken, readyForFacebookReplies, readyForInstagramReplies, readyForReplies: readyForFacebookReplies && readyForInstagramReplies };
 }
 
 export async function resolveMetaAccounts(): Promise<MetaAccountIds> {
@@ -119,12 +120,13 @@ export async function activateFacebookPageWebhook() {
 }
 
 export function verifyMetaSignature(rawBody: Buffer | undefined, signature: string | undefined) {
-  const secret = process.env.META_APP_SECRET;
-  if (!secret || !rawBody || !signature?.startsWith("sha256=")) return false;
-  const digest = `sha256=${createHmac("sha256", secret).update(rawBody).digest("hex")}`;
+  const secrets = [process.env.META_APP_SECRET, process.env.META_INSTAGRAM_APP_SECRET].filter((secret): secret is string => Boolean(secret));
+  if (!secrets.length || !rawBody || !signature?.startsWith("sha256=")) return false;
   const incoming = Buffer.from(signature, "utf8");
-  const expected = Buffer.from(digest, "utf8");
-  return incoming.length === expected.length && timingSafeEqual(incoming, expected);
+  return secrets.some(secret => {
+    const expected = Buffer.from(`sha256=${createHmac("sha256", secret).update(rawBody).digest("hex")}`, "utf8");
+    return incoming.length === expected.length && timingSafeEqual(incoming, expected);
+  });
 }
 
 function channelFor(platform: "instagram" | "facebook", messaging: Record<string, unknown>): SocialChannel {

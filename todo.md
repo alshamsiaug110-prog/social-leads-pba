@@ -38,7 +38,13 @@
 - [x] Keep autoscaling hosting by user decision; document its cold-start limitation and configure the Meta webhook only after a stable published URL is available.
 - [x] Add and verify a committed operations note that explains autoscaling cold starts and the recommended Meta-webhook monitoring response.
 - [ ] Confirm an end-to-end Instagram direct-message response from an external personal account after the production live-reply switch is enabled.
+- [ ] Identify and correct the Instagram API application binding so the external personal-account DM is delivered to the published webhook.
+- [ ] Add a separate protected Instagram API app secret and accept valid webhook signatures from either the Facebook app or Instagram API app.
+- [x] Disable the legacy Facebook Page instant-reply automation that conflicts with the approved bilingual Social Desk flow; leave unrelated Page automations unchanged.
+- [ ] Verify Meta persisted the legacy Auto-reply rule as disabled in the automation status view.
+- [ ] Confirm unrelated Facebook Page automations remain unchanged after disabling only the legacy Auto-reply rule.
+- [ ] Confirm a fresh personal-account Facebook Messenger test no longer receives the old Peter Pan/PSI welcome response.
 - [x] Correct the production integrations guidance so it reports the approved live-reply state rather than stale dry-run wording.
-- [ ] Republish the latest live-status guidance and verify the production Integrations page reports controlled live replies rather than dry-run mode.
-- [ ] Publish the checkpointed application and activate the durable 10:00, 16:00, and 22:00 Cairo-time metrics schedule from the Integrations page.
+- [x] Republish the latest live-status guidance and verify the production Integrations page reports controlled live replies rather than dry-run mode.
+- [x] Publish the checkpointed application and verify the durable 10:00, 16:00, and 22:00 Cairo-time metrics schedule is active in the Integrations page.
 - [x] Add a persistent in-website staff notification center for escalations, unhandled customer questions, integration failures, and publishing outcomes.

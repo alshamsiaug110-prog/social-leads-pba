@@ -14,8 +14,8 @@ export function registerSocialRoutes(app: Express) {
   });
   app.post("/api/meta/webhook", async (req: RawRequest, res: Response) => {
     const readiness = metaReadiness();
-    if (!readiness.hasAppSecret) return res.status(503).json({ error: "Webhook signature secret is not configured" });
-    if (readiness.hasAppSecret && !verifyMetaSignature(req.rawBody, req.header("x-hub-signature-256") ?? undefined)) return res.status(403).json({ error: "Invalid webhook signature" });
+    if (!readiness.hasAppSecret && !readiness.hasInstagramAppSecret) return res.status(503).json({ error: "Webhook signature secret is not configured" });
+    if (!verifyMetaSignature(req.rawBody, req.header("x-hub-signature-256") ?? undefined)) return res.status(403).json({ error: "Invalid webhook signature" });
     try { for (const event of normalizeMetaPayload(req.body)) await handleInboundEvent(event); return res.status(200).send("EVENT_RECEIVED"); }
     catch (error) { console.error("[Meta webhook] event processing failed", error); await db.createStaffNotification({ type: "integration_failure", severity: "critical", title: "Meta webhook processing failed", detail: "An incoming social event could not be processed. Review the integration and conversation log.", href: "/integrations" }); return res.status(500).json({ error: "Webhook processing failed" }); }
   });

@@ -1,6 +1,7 @@
+import { createHmac } from "crypto";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import * as db from "../db";
-import { activateFacebookPageWebhook, buildMetaReplyRequest, discoverMetaAccounts, normalizeMetaPayload, resolveFacebookPageAccessToken } from "./meta";
+import { activateFacebookPageWebhook, buildMetaReplyRequest, discoverMetaAccounts, normalizeMetaPayload, resolveFacebookPageAccessToken, verifyMetaSignature } from "./meta";
 
 vi.mock("../db", () => ({
   getIntegrationMetadata: vi.fn(),
@@ -36,6 +37,17 @@ describe("Meta event normalization", () => {
     vi.stubEnv("META_PAGE_ACCESS_TOKEN", "page-token");
     const request = buildMetaReplyRequest({ externalEventId: "message-2", platform: "facebook", channel: "facebook_messenger", senderId: "customer-2", body: "Arabic", occurredAt: new Date() }, "Hello", { pageId: "1097461780292447" });
     expect(request).toMatchObject({ url: "https://graph.facebook.com/v26.0/1097461780292447/messages", token: "page-token", payload: { recipient: { id: "customer-2" }, message: { text: "Hello" } } });
+  });
+
+  it("accepts valid webhook signatures from either the Facebook app or the separate Instagram API app", () => {
+    const body = Buffer.from('{"object":"instagram"}');
+    vi.stubEnv("META_APP_SECRET", "facebook-secret");
+    vi.stubEnv("META_INSTAGRAM_APP_SECRET", "instagram-secret");
+    const facebookSignature = `sha256=${createHmac("sha256", "facebook-secret").update(body).digest("hex")}`;
+    const instagramSignature = `sha256=${createHmac("sha256", "instagram-secret").update(body).digest("hex")}`;
+    expect(verifyMetaSignature(body, facebookSignature)).toBe(true);
+    expect(verifyMetaSignature(body, instagramSignature)).toBe(true);
+    expect(verifyMetaSignature(body, "sha256=not-a-real-signature")).toBe(false);
   });
 
   it("derives the Page-specific token when the configured Facebook credential is a user token", async () => {

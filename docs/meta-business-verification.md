@@ -73,3 +73,15 @@ Using Meta’s documented app-subscriptions flow, the Autubot app-level Instagra
 ## Autoscale operating note
 
 The project remains on Manus autoscaling hosting by the academy’s explicit decision. The public webhook route is stable and correctly validates Meta verification requests, but an autoscaling instance can have an initial cold-start delay after inactivity. Meta’s delivery retries and the implementation’s webhook-delivery deduplication provide resilience, but staff should monitor the notification center after long idle periods and consider Reserved hosting only if rapid first-event response becomes business-critical.
+
+## Initial external DM test observation
+
+After the owner sent `Hi` from a personal Instagram account, the published conversation log had not yet recorded an inbound event after the first refresh interval. The app-level and account-level subscriptions remain verified active; the delivery path is being traced before treating the test as complete.
+
+## Legacy Facebook Page automation review
+
+An external Facebook test returned a legacy welcome response referencing Peter Pan and PSI rather than the approved bilingual Social Desk flow. The authenticated Premier Ballet Academy Meta Business Suite **Inbox → Automations** surface is available for review. This legacy automation must be disabled or rewritten before the controlled bot is treated as the sole customer-service responder.
+
+### Resolution — legacy welcome rule disabled
+
+The conflicting **Auto-reply** rule was opened in Meta Business Suite and confirmed to contain the unapproved Peter Pan / PSI welcome copy. Its automation switch is now **Off** and the disabled state was saved. The legacy rule no longer sends first-message greetings on Messenger or Instagram; the other existing Page automations were left unchanged.
