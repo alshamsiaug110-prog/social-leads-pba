@@ -38,5 +38,7 @@
 - [x] Keep autoscaling hosting by user decision; document its cold-start limitation and configure the Meta webhook only after a stable published URL is available.
 - [x] Add and verify a committed operations note that explains autoscaling cold starts and the recommended Meta-webhook monitoring response.
 - [ ] Confirm an end-to-end Instagram direct-message response from an external personal account after the production live-reply switch is enabled.
+- [x] Correct the production integrations guidance so it reports the approved live-reply state rather than stale dry-run wording.
+- [ ] Republish the latest live-status guidance and verify the production Integrations page reports controlled live replies rather than dry-run mode.
 - [ ] Publish the checkpointed application and activate the durable 10:00, 16:00, and 22:00 Cairo-time metrics schedule from the Integrations page.
 - [x] Add a persistent in-website staff notification center for escalations, unhandled customer questions, integration failures, and publishing outcomes.
