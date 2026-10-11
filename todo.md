@@ -44,6 +44,9 @@
 - [ ] Verify Meta persisted the legacy Auto-reply rule as disabled in the automation status view.
 - [ ] Confirm unrelated Facebook Page automations remain unchanged after disabling only the legacy Auto-reply rule.
 - [ ] Confirm a fresh personal-account Facebook Messenger test no longer receives the old Peter Pan/PSI welcome response.
+- [x] Add a staff-only Browser Use automation runner using the official Cloud V4 API, with server-side credentials and persisted run history.
+- [x] Add protected dashboard controls for submitting, monitoring, and cancelling Browser Use tasks without exposing the API key.
+- [x] Add regression coverage for Browser Use API request headers, run status handling, cancellation, and missing-key safeguards.
 - [x] Correct the production integrations guidance so it reports the approved live-reply state rather than stale dry-run wording.
 - [x] Republish the latest live-status guidance and verify the production Integrations page reports controlled live replies rather than dry-run mode.
 - [x] Publish the checkpointed application and verify the durable 10:00, 16:00, and 22:00 Cairo-time metrics schedule is active in the Integrations page.

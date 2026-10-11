@@ -43,6 +43,13 @@
       "when": 1787093070966,
       "tag": "0005_watery_hardball",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "5",
+      "when": 1791675461697,
+      "tag": "0006_abandoned_bushwacker",
+      "breakpoints": true
     }
   ]
 }
