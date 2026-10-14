@@ -19,6 +19,7 @@ import {
   users,
   webhookDeliveries,
 } from "../drizzle/schema";
+import { sendNtfy } from "./social/ntfy";
 import type { FaqSeed } from "./social/types";
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -262,6 +263,23 @@ export async function appendMessageEvent(input: {
       set: { externalMessageId: input.externalMessageId },
     });
 }
+export async function getRecentUnselectedInbound(
+  conversationId: number,
+  limit = 5
+) {
+  const db = await requireDb();
+  return db
+    .select({
+      externalMessageId: messageEvents.externalMessageId,
+      body: messageEvents.body,
+    })
+    .from(messageEvents)
+    .where(
+      sql`${messageEvents.conversationId} = ${conversationId} and ${messageEvents.direction} = 'inbound' and ${messageEvents.language} = 'unselected'`
+    )
+    .orderBy(desc(messageEvents.id))
+    .limit(limit);
+}
 export async function recordWebhookDelivery(input: {
   externalEventId: string;
   platform: "instagram" | "facebook";
@@ -461,6 +479,8 @@ export async function createStaffNotification(input: {
 }) {
   const db = await requireDb();
   const [result] = await db.insert(staffNotifications).values(input);
+  // Best-effort phone push; sendNtfy never throws and is skipped when unconfigured.
+  void sendNtfy(input);
   return Number(result.insertId);
 }
 export async function listStaffNotifications() {

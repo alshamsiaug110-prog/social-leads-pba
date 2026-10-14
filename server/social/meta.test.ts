@@ -22,6 +22,7 @@ afterEach(() => {
   process.env.META_INSTAGRAM_ACCESS_TOKEN = originalInstagramToken;
   process.env.META_PAGE_ACCESS_TOKEN = originalPageToken;
   vi.restoreAllMocks();
+  vi.unstubAllEnvs();
 });
 
 describe("Meta event normalization", () => {
@@ -72,6 +73,138 @@ describe("Meta event normalization", () => {
       channel: "facebook_comment",
       targetId: "comment-1",
       body: "Fees?",
+    });
+  });
+
+  it("normalizes a real-shaped Instagram comment webhook (field comments, id and text)", () => {
+    const events = normalizeMetaPayload({
+      object: "instagram",
+      entry: [
+        {
+          id: "ig-account-1",
+          changes: [
+            {
+              field: "comments",
+              value: {
+                id: "ig-comment-1",
+                text: "How much are the fees?",
+                from: { id: "customer-3", username: "parent" },
+                media: { id: "media-1" },
+              },
+            },
+          ],
+        },
+      ],
+    });
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({
+      platform: "instagram",
+      channel: "instagram_comment",
+      targetId: "ig-comment-1",
+      senderId: "customer-3",
+      body: "How much are the fees?",
+    });
+  });
+
+  it("ignores comments written by the academy's own Page or Instagram account", () => {
+    vi.stubEnv("META_PAGE_ID", "page-1");
+    vi.stubEnv("META_INSTAGRAM_ACCOUNT_ID", "ig-account-1");
+    const facebook = normalizeMetaPayload({
+      object: "page",
+      entry: [
+        {
+          id: "page-1",
+          changes: [
+            {
+              field: "feed",
+              value: {
+                item: "comment",
+                verb: "add",
+                comment_id: "bot-reply-1",
+                from: { id: "page-1" },
+                message: "Hello — you are interacting with the automated assistant.",
+              },
+            },
+          ],
+        },
+      ],
+    });
+    const instagram = normalizeMetaPayload({
+      object: "instagram",
+      entry: [
+        {
+          id: "ig-account-1",
+          changes: [
+            {
+              field: "comments",
+              value: {
+                id: "bot-reply-2",
+                text: "Hello — you are interacting with the automated assistant.",
+                from: { id: "ig-account-1" },
+              },
+            },
+          ],
+        },
+      ],
+    });
+    expect(facebook).toHaveLength(0);
+    expect(instagram).toHaveLength(0);
+  });
+
+  it("only replies to newly added Facebook comments, not edits or removals", () => {
+    const payload = (verb: string) => ({
+      object: "page",
+      entry: [
+        {
+          id: "page-1",
+          changes: [
+            {
+              field: "feed",
+              value: {
+                item: "comment",
+                verb,
+                comment_id: `comment-${verb}`,
+                from: { id: "customer-4" },
+                message: "Fees?",
+              },
+            },
+          ],
+        },
+      ],
+    });
+    expect(normalizeMetaPayload(payload("add"))).toHaveLength(1);
+    expect(normalizeMetaPayload(payload("edited"))).toHaveLength(0);
+    expect(normalizeMetaPayload(payload("remove"))).toHaveLength(0);
+  });
+
+  it("replies to Facebook comments on /comments and Instagram comments on /replies", () => {
+    vi.stubEnv("META_PAGE_ACCESS_TOKEN", "page-token");
+    vi.stubEnv("META_INSTAGRAM_ACCESS_TOKEN", "instagram-token");
+    const base = {
+      externalEventId: "c-1",
+      senderId: "customer-5",
+      body: "Fees?",
+      targetId: "comment-123",
+      occurredAt: new Date(),
+      rawType: "comment",
+    } as const;
+    const facebook = buildMetaReplyRequest(
+      { ...base, platform: "facebook", channel: "facebook_comment" },
+      "Hello",
+      { pageId: "page-1" }
+    );
+    const instagram = buildMetaReplyRequest(
+      { ...base, platform: "instagram", channel: "instagram_comment" },
+      "Hello",
+      { instagramId: "ig-1" }
+    );
+    expect(facebook).toMatchObject({
+      url: "https://graph.facebook.com/v26.0/comment-123/comments",
+      payload: { message: "Hello" },
+    });
+    expect(instagram).toMatchObject({
+      url: "https://graph.instagram.com/v26.0/comment-123/replies",
+      payload: { message: "Hello" },
     });
   });
 
