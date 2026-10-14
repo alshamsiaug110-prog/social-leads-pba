@@ -301,6 +301,20 @@ function textFromMessage(message: Record<string, unknown>) {
   return typeof message.text === "string" ? message.text.trim() : "";
 }
 
+function isOwnAccount(
+  platform: "instagram" | "facebook",
+  authorId: string,
+  entryId: string
+) {
+  if (!authorId || authorId === "unknown") return false;
+  if (authorId === entryId) return true;
+  const ownIds =
+    platform === "facebook"
+      ? [process.env.META_PAGE_ID, academyPageId]
+      : [process.env.META_INSTAGRAM_ACCOUNT_ID];
+  return ownIds.some(id => Boolean(id) && id === authorId);
+}
+
 export function normalizeMetaPayload(payload: any): InboundSocialEvent[] {
   const platform =
     payload?.object === "instagram"
@@ -329,21 +343,34 @@ export function normalizeMetaPayload(payload: any): InboundSocialEvent[] {
     }
     for (const change of entry.changes ?? []) {
       const value = change?.value ?? {};
-      if (String(value.item ?? "") !== "comment" && !value.comment_id) continue;
+      const isFacebookComment =
+        platform === "facebook" &&
+        (String(value.item ?? "") === "comment" || Boolean(value.comment_id));
+      const isInstagramComment =
+        platform === "instagram" &&
+        String(change?.field ?? "") === "comments" &&
+        Boolean(value.id);
+      if (!isFacebookComment && !isInstagramComment) continue;
+      // Facebook sends add/edited/remove; only new comments get an automated reply.
+      if (platform === "facebook" && value.verb && value.verb !== "add")
+        continue;
+      const authorId = String(value.from?.id ?? value.sender_id ?? "unknown");
+      // Never answer comments written by the academy's own accounts (including
+      // the bot's own replies), which would otherwise create a reply loop.
+      if (isOwnAccount(platform, authorId, String(entry.id ?? ""))) continue;
       const body = String(value.message ?? value.text ?? "").trim();
       if (!body) continue;
+      const commentId = String(value.comment_id ?? value.id ?? "");
       events.push({
-        externalEventId: String(
-          value.comment_id ??
-            value.id ??
-            `${entry.id}:${change.field}:${value.created_time ?? Date.now()}`
-        ),
+        externalEventId:
+          commentId ||
+          `${entry.id}:${change.field}:${value.created_time ?? Date.now()}`,
         platform,
         channel:
           platform === "instagram" ? "instagram_comment" : "facebook_comment",
-        senderId: String(value.from?.id ?? value.sender_id ?? "unknown"),
+        senderId: authorId,
         body,
-        targetId: String(value.comment_id ?? value.id ?? ""),
+        targetId: commentId,
         occurredAt: new Date(
           value.created_time ? Number(value.created_time) * 1000 : Date.now()
         ),
@@ -376,8 +403,10 @@ export function buildMetaReplyRequest(
     event.channel === "facebook_comment"
   ) {
     if (!event.targetId) return { detail: "Comment identifier is missing." };
+    // Instagram replies use /replies; Facebook Page comment replies use /comments.
+    const edge = isInstagram ? "replies" : "comments";
     return {
-      url: `${host}/${event.targetId}/replies`,
+      url: `${host}/${event.targetId}/${edge}`,
       payload: { message: text },
       token,
     };
@@ -437,14 +466,27 @@ export async function sendMetaReply(
   );
   if ("detail" in request)
     return { sent: false, mode: "unavailable", detail: request.detail };
-  const response = await fetch(request.url, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${request.token}`,
-    },
-    body: JSON.stringify(request.payload),
-  });
+  let response: Response;
+  try {
+    response = await fetch(request.url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${request.token}`,
+      },
+      body: JSON.stringify(request.payload),
+      signal: AbortSignal.timeout(10000),
+    });
+  } catch (error) {
+    return {
+      sent: false,
+      mode: "unavailable",
+      detail:
+        error instanceof Error
+          ? `Network error contacting Meta: ${error.message}`
+          : "Network error contacting Meta.",
+    };
+  }
   if (!response.ok)
     return {
       sent: false,

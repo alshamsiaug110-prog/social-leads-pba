@@ -16,7 +16,7 @@ async function emit(
   if (conversationId)
     await db.appendMessageEvent({
       conversationId,
-      externalMessageId: `${event.externalEventId}:reply:${Date.now()}`,
+      externalMessageId: `${event.externalEventId}:reply:${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       externalTargetId: event.targetId ?? null,
       channel: event.channel,
       direction: "outbound",
@@ -91,6 +91,37 @@ export async function handleInboundEvent(event: InboundSocialEvent) {
       null,
       false
     );
+    // The customer's first message was not a language choice. If it was an
+    // answerable question, answer it now instead of making them ask again.
+    const earlier = await db.getRecentUnselectedInbound?.(conversation.id);
+    const pending = earlier?.find(
+      message =>
+        message.externalMessageId !== event.externalEventId &&
+        !detectLanguageChoice(message.body)
+    );
+    if (pending) {
+      const pendingMatch = matchApprovedFaq(
+        pending.body,
+        await db.getApprovedFaqEntries()
+      );
+      if (pendingMatch) {
+        await emit(
+          event,
+          conversation.id,
+          choice === "ar"
+            ? pendingMatch.entry.answerAr
+            : pendingMatch.entry.answerEn,
+          choice,
+          pendingMatch.entry.id,
+          false
+        );
+        return {
+          handled: "language-selected" as const,
+          language: choice,
+          answeredPending: pendingMatch.entry.id,
+        };
+      }
+    }
     return { handled: "language-selected" as const, language: choice };
   }
   const match = matchApprovedFaq(event.body, await db.getApprovedFaqEntries());
